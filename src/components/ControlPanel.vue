@@ -1,28 +1,49 @@
 <template>
   <div class="control-panel">
-    <label for="startNode">Grafos Eulerianos:</label>
+    <label for="startNode">DIJKSTRA</label>
 
     <select v-model="optselected">
       <option value="1">Ejemplo 1</option>
       <option value="2">Ejemplo 2</option>
       <option value="3">Ejemplo 3</option>
+      <option value="4">Cargar grafo desde BD</option>
     </select>
 
     <label for="startNode">Nodo Inicio:</label>
-    <select v-model="startNode">
+    <select :disabled="optselected === ''" v-model="startNode">
       <option v-for="node in nodes" :key="node.id" :value="node.id">
         {{ node.nombre }}
       </option>
     </select>
 
     <label for="endNode">Nodo Final:</label>
-    <select v-model="endNode">
+    <select :disabled="optselected === ''" v-model="endNode">
       <option v-for="node in nodes" :key="node.id" :value="node.id">
         {{ node.nombre }}
       </option>
     </select>
-
-    <button @click="findShortestPath">Hallar camino Euleriano</button>
+    <button
+      :disabled="startNode === null || endNode === null"
+      @click="findShortestPath"
+    >
+      Hallar rutas
+    </button>
+    <div>
+      <hr />
+      <h5 style="text-align: start">
+        <i class="bi bi-1-circle-fill" style="color: #a70000"></i> Camino mas
+        corto ({{ firstDistance }}
+        Km)
+      </h5>
+      <p v-text="firstPath"></p>
+      <hr />
+      <h5 style="text-align: start">
+        <i class="bi bi-2-circle-fill" style="color: #004d00"></i>
+        Camino mas corto ({{ secondDistance }}
+        Km)
+      </h5>
+      <p v-text="secondPath"></p>
+    </div>
 
     <textarea v-model="result"></textarea>
   </div>
@@ -30,12 +51,16 @@
 
 <script setup lang="ts">
 import { useGraphStore } from "../stores/graph.store";
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted, watch, computed } from "vue";
 
 const graphStore = useGraphStore();
 const nodes = ref();
 const edges = ref();
-const result = ref();
+const result = ref("");
+const firstPath = computed(() => graphStore.shortestPath);
+const secondPath = computed(() => graphStore.secondShortestPath);
+const firstDistance = computed(() => graphStore.shortestDistance);
+const secondDistance = computed(() => graphStore.secondShortestDistance);
 const startNode = ref<number | null>(null);
 const endNode = ref<number | null>(null);
 const optselected = ref("");
@@ -43,6 +68,7 @@ const optselected = ref("");
 function findShortestPath() {
   if (startNode.value !== null && endNode.value !== null) {
     graphStore.runDijkstra(startNode.value, endNode.value);
+    graphStore.findSecondShortestPath(startNode.value, endNode.value);
     const markNodes = graphStore.shortestPath
       .map((id) => graphStore.nodes.find((n) => n.id === id))
       .filter((node) => node !== undefined)
@@ -141,11 +167,13 @@ function buildEulerianPath(startNode: number, endNode: number) {
 watch(optselected, () => {
   console.log("selec", optselected.value);
   if (optselected.value) {
-    graphStore.fetchGraphData(Number(optselected.value));
-    graphStore.setSelectedOption(Number(optselected.value));
-    console.log(graphStore.nodes);
-    nodes.value = graphStore.nodes;
-    edges.value = graphStore.edges;
+    (async () => {
+      await graphStore.fetchGraphData(Number(optselected.value));
+      graphStore.setSelectedOption(Number(optselected.value));
+      console.log(graphStore.nodes);
+      nodes.value = graphStore.nodes;
+      edges.value = graphStore.edges;
+    })();
   }
 });
 
@@ -162,5 +190,19 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+button {
+  background: green;
+  border-radius: 5px;
+  padding: 5px 10px;
+  margin-top: 20px;
+  color: white;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: rgb(70, 107, 70);
+  color: rgb(46, 46, 46);
+  cursor: not-allowed;
 }
 </style>

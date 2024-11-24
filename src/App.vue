@@ -1,6 +1,11 @@
 <template>
-  <ControlPanel />
-  <CanvasComponent />
+  <div style="width: 100%; display: flex; justify-content: start">
+    <div style="width: 300px">
+      <ControlPanel />
+    </div>
+    <hr style="margin-left: 10px" aria-orientation="vertical" />
+    <CanvasComponent />
+  </div>
 </template>
 
 <script lang="ts">
