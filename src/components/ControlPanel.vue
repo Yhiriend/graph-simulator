@@ -28,6 +28,9 @@
     >
       Hallar rutas
     </button>
+    <button :disabled="firstPath.length <= 0" @click="cleanPaths">
+      Limpiar rutas
+    </button>
     <div>
       <hr />
       <h5 style="text-align: start">
@@ -64,7 +67,12 @@ const secondDistance = computed(() => graphStore.secondShortestDistance);
 const startNode = ref<number | null>(null);
 const endNode = ref<number | null>(null);
 const optselected = ref("");
-
+const cleanPaths = () => {
+  graphStore.shortestPath = [];
+  graphStore.shortestDistance = null;
+  graphStore.secondShortestDistance = null;
+  graphStore.secondShortestPath = [];
+};
 function findShortestPath() {
   if (startNode.value !== null && endNode.value !== null) {
     graphStore.runDijkstra(startNode.value, endNode.value);
