@@ -6,18 +6,21 @@
     <hr style="margin-left: 10px" aria-orientation="vertical" />
     <CanvasComponent />
   </div>
+  <LoadingComponent />
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
 import CanvasComponent from "./components/CanvasComponent.vue";
 import ControlPanel from "./components/ControlPanel.vue";
+import LoadingComponent from "./components/LoadingComponent.vue";
 
 export default defineComponent({
   name: "App",
   components: {
     CanvasComponent,
     ControlPanel,
+    LoadingComponent,
   },
 });
 </script>

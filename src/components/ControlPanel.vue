@@ -74,15 +74,19 @@ const cleanPaths = () => {
   graphStore.secondShortestPath = [];
 };
 function findShortestPath() {
-  if (startNode.value !== null && endNode.value !== null) {
-    graphStore.runDijkstra(startNode.value, endNode.value);
-    graphStore.findSecondShortestPath(startNode.value, endNode.value);
-    const markNodes = graphStore.shortestPath
-      .map((id) => graphStore.nodes.find((n) => n.id === id))
-      .filter((node) => node !== undefined)
-      .map((n) => n.nombre);
-    result.value = `Camino más corto: ${markNodes.join(", ")}`;
-  }
+  graphStore.setIsLoading(true);
+  setTimeout(() => {
+    if (startNode.value !== null && endNode.value !== null) {
+      graphStore.runDijkstra(startNode.value, endNode.value);
+      graphStore.findSecondShortestPath(startNode.value, endNode.value);
+      const markNodes = graphStore.shortestPath
+        .map((id) => graphStore.nodes.find((n) => n.id === id))
+        .filter((node) => node !== undefined)
+        .map((n) => n.nombre);
+      result.value = `Camino más corto: ${markNodes.join(", ")}`;
+    }
+    graphStore.setIsLoading(false);
+  }, 1500);
   // if (nodes.value && edges.value) {
   //   findEulerianPathOrCircuit();
   // }
@@ -179,7 +183,14 @@ watch(optselected, () => {
       await graphStore.fetchGraphData(Number(optselected.value));
       graphStore.setSelectedOption(Number(optselected.value));
       console.log(graphStore.nodes);
-      nodes.value = graphStore.nodes;
+      nodes.value = graphStore.nodes
+        .map((n) => {
+          return {
+            ...n,
+            nombre: `${n.nombre}-${n.id}`,
+          };
+        })
+        .sort((a, b) => a.nombre.localeCompare(b.nombre));
       edges.value = graphStore.edges;
     })();
   }

@@ -152,6 +152,7 @@ interface GraphState {
   selectedOption: number | null;
   shortestCycle: number[];
   shortestCycleDistance: number | null;
+  isLoading: boolean;
 }
 
 export const useGraphStore = defineStore("graph", {
@@ -166,8 +167,12 @@ export const useGraphStore = defineStore("graph", {
     selectedOption: null as number | null,
     shortestCycle: [],
     shortestCycleDistance: null as number | null,
+    isLoading: false,
   }),
   actions: {
+    setIsLoading(isLoading: boolean) {
+      this.isLoading = isLoading;
+    },
     setSelectedOption(opt: number) {
       this.selectedOption = opt;
     },
