@@ -209,7 +209,7 @@ const drawConnections = () => {
       ctx.moveTo(x1 + offsetX, y1 + offsetY);
       ctx.lineTo(x2 + offsetX, y2 + offsetY);
       ctx.strokeStyle = "#1d1d1d80"; // Color del camino más corto
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1;
       ctx.stroke();
 
       // Calculamos el punto medio de la línea
@@ -226,7 +226,7 @@ const drawConnections = () => {
         ctx.beginPath();
         ctx.moveTo(x1 + offsetX, y1 + offsetY);
         ctx.lineTo(x2 + offsetX, y2 + offsetY);
-        ctx.strokeStyle = "#a7000080"; // Color del camino más corto
+        ctx.strokeStyle = "#F01101"; // Color del camino más corto
         ctx.lineWidth = 2;
         ctx.stroke();
       }
@@ -236,7 +236,7 @@ const drawConnections = () => {
         ctx.beginPath();
         ctx.moveTo(x1 - offsetX, y1 - offsetY);
         ctx.lineTo(x2 - offsetX, y2 - offsetY);
-        ctx.strokeStyle = "#004d0080"; // Color del segundo camino más corto
+        ctx.strokeStyle = "#189E01"; // Color del segundo camino más corto
         ctx.lineWidth = 2;
         ctx.stroke();
       }

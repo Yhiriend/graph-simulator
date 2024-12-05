@@ -152,7 +152,10 @@ interface GraphState {
   selectedOption: number | null;
   shortestCycle: number[];
   shortestCycleDistance: number | null;
+  secondShortesCycle: number[];
+  secondShortesCycleDistance: number | null;
   isLoading: boolean;
+  totalPaths: number | null;
 }
 
 export const useGraphStore = defineStore("graph", {
@@ -167,7 +170,10 @@ export const useGraphStore = defineStore("graph", {
     selectedOption: null as number | null,
     shortestCycle: [],
     shortestCycleDistance: null as number | null,
+    secondShortesCycle: [],
+    secondShortesCycleDistance: null as number | null,
     isLoading: false,
+    totalPaths: 0,
   }),
   actions: {
     setIsLoading(isLoading: boolean) {
@@ -193,12 +199,100 @@ export const useGraphStore = defineStore("graph", {
         console.log("edges: ", this.edges);
       }
     },
-    findShortestCycle(startNodeId: number) {
-      const visited = new Set<number>(); // Para evitar ciclos incorrectos
-      const memo: number[][] = []; // Cambiar a un array de arrays de números
+    async findShortestCycle(startNodeId: number): Promise<void> {
+      const visited = new Set<number>();
+      const memo: number[][] = [];
       let shortestCycle: number[] = [];
       let shortestCycleDistance = Infinity;
-      const maxDepth = 30; // Limitar la profundidad máxima
+      const maxDepth = 30;
+
+      const isEdgeValid = (nodeId1: number, nodeId2: number): boolean => {
+        return this.edges.some(
+          (edge) =>
+            (edge.v1 === nodeId1 && edge.v2 === nodeId2) ||
+            (edge.v1 === nodeId2 && edge.v2 === nodeId1)
+        );
+      };
+
+      const arraysEqual = (arr1: number[], arr2: number[]): boolean => {
+        if (arr1.length !== arr2.length) return false;
+        for (let i = 0; i < arr1.length; i++) {
+          if (arr1[i] !== arr2[i]) return false;
+        }
+        return true;
+      };
+
+      const dfs = async (
+        currentNodeId: number,
+        path: number[],
+        currentDistance: number
+      ): Promise<void> => {
+        if (path.length > maxDepth) return;
+        if (currentDistance >= shortestCycleDistance) return;
+
+        for (const memoPath of memo) {
+          if (arraysEqual(memoPath, path)) return;
+        }
+
+        memo.push([...path]);
+        this.totalPaths = memo.length;
+        visited.add(currentNodeId);
+
+        const edgesFromCurrent = this.edges
+          .filter(
+            (edge) => edge.v1 === currentNodeId || edge.v2 === currentNodeId
+          )
+          .sort((a, b) => a.ponderacion - b.ponderacion);
+
+        for (const edge of edgesFromCurrent) {
+          const neighborId = edge.v1 === currentNodeId ? edge.v2 : edge.v1;
+
+          if (
+            neighborId === startNodeId &&
+            path.length >= 3 &&
+            isEdgeValid(path[path.length - 1], startNodeId)
+          ) {
+            const cycleDistance = currentDistance + edge.ponderacion;
+            if (cycleDistance < shortestCycleDistance) {
+              shortestCycleDistance = cycleDistance;
+              shortestCycle = [...path, neighborId];
+            }
+            continue;
+          }
+
+          if (!visited.has(neighborId) && !path.includes(neighborId)) {
+            await new Promise((resolve) => setTimeout(resolve, 0)); // Desbloquear el hilo principal
+            await dfs(
+              neighborId,
+              [...path, neighborId],
+              currentDistance + edge.ponderacion
+            );
+          }
+        }
+
+        visited.delete(currentNodeId);
+      };
+
+      await dfs(startNodeId, [startNodeId], 0);
+
+      if (shortestCycle.length > 0) {
+        this.shortestPath = shortestCycle;
+        this.shortestDistance = shortestCycleDistance;
+        console.log("Ciclo más corto encontrado:", this.shortestPath);
+        console.log("Distancia del ciclo más corto:", this.shortestDistance);
+      } else {
+        console.log("No se encontró ningún ciclo desde el nodo", startNodeId);
+      }
+    },
+    findSecondShortestCycle(startNodeId: number) {
+      const visited = new Set<number>(); // Nodos visitados
+      const memo: number[][] = []; // Caminos explorados
+      let firstCycle: number[] | null = null; // Primer ciclo encontrado
+      let shortestCycle: number[] = [];
+      let shortestCycleDistance = Infinity;
+      let secondShortestCycle: number[] = [];
+      let secondShortestCycleDistance = Infinity;
+      const maxDepth = 30; // Limitar profundidad máxima
 
       // Verificación de aristas válidas
       const isEdgeValid = (nodeId1: number, nodeId2: number): boolean => {
@@ -209,15 +303,16 @@ export const useGraphStore = defineStore("graph", {
         );
       };
 
-      // DFS recursivo con validación de ciclo
+      // DFS recursivo para buscar ciclos
       const dfs = (
         currentNodeId: number,
         path: number[],
-        currentDistance: number
+        currentDistance: number,
+        skipCycle: number[] | null = null // Ciclo a omitir
       ) => {
         // Condiciones de interrupción
-        if (path.length > maxDepth) return; // No superar la profundidad máxima
-        if (currentDistance >= shortestCycleDistance) return; // Evitar caminos más largos
+        if (path.length > maxDepth) return; // No superar profundidad máxima
+        if (currentDistance >= secondShortestCycleDistance) return; // Evitar caminos más largos
 
         // Verificar si el camino ya ha sido recorrido
         for (const memoPath of memo) {
@@ -246,10 +341,34 @@ export const useGraphStore = defineStore("graph", {
             path.length >= 3 &&
             isEdgeValid(path[path.length - 1], startNodeId)
           ) {
+            const cycle = [...path, neighborId];
             const cycleDistance = currentDistance + edge.ponderacion;
-            if (cycleDistance < shortestCycleDistance) {
-              shortestCycleDistance = cycleDistance;
-              shortestCycle = [...path, neighborId];
+
+            // Validar si el ciclo es único
+            if (
+              !skipCycle ||
+              (!arraysEqual(cycle, skipCycle) &&
+                !arraysEqual(cycle, skipCycle.slice().reverse()))
+            ) {
+              if (cycleDistance < shortestCycleDistance) {
+                // Actualizar primer ciclo más corto
+                secondShortestCycle = [...shortestCycle];
+                secondShortestCycleDistance = shortestCycleDistance;
+
+                shortestCycle = cycle;
+                shortestCycleDistance = cycleDistance;
+
+                // Registrar el primer ciclo encontrado
+                firstCycle = [...shortestCycle];
+              } else if (
+                cycleDistance < secondShortestCycleDistance &&
+                !arraysEqual(cycle, shortestCycle) &&
+                !arraysEqual(cycle, shortestCycle.slice().reverse())
+              ) {
+                // Actualizar segundo ciclo más corto
+                secondShortestCycle = cycle;
+                secondShortestCycleDistance = cycleDistance;
+              }
             }
             continue;
           }
@@ -259,7 +378,8 @@ export const useGraphStore = defineStore("graph", {
             dfs(
               neighborId,
               [...path, neighborId],
-              currentDistance + edge.ponderacion
+              currentDistance + edge.ponderacion,
+              skipCycle
             );
           }
         }
@@ -280,22 +400,137 @@ export const useGraphStore = defineStore("graph", {
       // Iniciar DFS desde el nodo inicial
       dfs(startNodeId, [startNodeId], 0);
 
-      // Guardar el ciclo más corto encontrado
-      if (shortestCycle.length > 0) {
-        this.shortestPath = shortestCycle;
-        this.shortestDistance = shortestCycleDistance;
-        console.log("Ciclo más corto encontrado:", this.shortestPath);
-        console.log("Distancia del ciclo más corto:", this.shortestDistance);
+      // Iniciar búsqueda para el segundo ciclo más corto si el primero fue encontrado
+      if (firstCycle) {
+        dfs(startNodeId, [startNodeId], 0, firstCycle);
+      }
+
+      if (secondShortestCycle.length > 0) {
+        console.log("Primer ciclo más corto:", shortestCycle);
+        console.log(
+          "Distancia del primer ciclo más corto:",
+          shortestCycleDistance
+        );
+        console.log("Segundo ciclo más corto:", secondShortestCycle);
+        console.log(
+          "Distancia del segundo ciclo más corto:",
+          secondShortestCycleDistance
+        );
+        this.secondShortestPath = secondShortestCycle;
+        this.secondShortestDistance = secondShortestCycleDistance;
       } else {
-        console.log("No se encontró ningún ciclo desde el nodo", startNodeId);
+        console.log(
+          "No se encontró un segundo ciclo desde el nodo",
+          startNodeId
+        );
+        return null;
       }
     },
-    runDijkstra(startNodeId: number, endNodeId: number) {
+    // findShortestCycle(startNodeId: number) {
+    //   const visited = new Set<number>(); // Para evitar ciclos incorrectos
+    //   const memo: number[][] = []; // Cambiar a un array de arrays de números
+    //   let shortestCycle: number[] = [];
+    //   let shortestCycleDistance = Infinity;
+    //   const maxDepth = 30; // Limitar la profundidad máxima
+
+    //   // Verificación de aristas válidas
+    //   const isEdgeValid = (nodeId1: number, nodeId2: number): boolean => {
+    //     return this.edges.some(
+    //       (edge) =>
+    //         (edge.v1 === nodeId1 && edge.v2 === nodeId2) ||
+    //         (edge.v1 === nodeId2 && edge.v2 === nodeId1)
+    //     );
+    //   };
+
+    //   // DFS recursivo con validación de ciclo
+    //   const dfs = (
+    //     currentNodeId: number,
+    //     path: number[],
+    //     currentDistance: number
+    //   ) => {
+    //     // Condiciones de interrupción
+    //     if (path.length > maxDepth) return; // No superar la profundidad máxima
+    //     if (currentDistance >= shortestCycleDistance) return; // Evitar caminos más largos
+
+    //     // Verificar si el camino ya ha sido recorrido
+    //     for (const memoPath of memo) {
+    //       if (arraysEqual(memoPath, path)) return; // Evitar caminos repetidos
+    //     }
+
+    //     // Registrar el camino en memo
+    //     memo.push([...path]);
+    //     this.totalPaths = memo.length;
+    //     // Marcar el nodo como visitado
+    //     visited.add(currentNodeId);
+
+    //     // Recorrer todas las aristas conectadas al nodo actual
+    //     const edgesFromCurrent = this.edges
+    //       .filter(
+    //         (edge) => edge.v1 === currentNodeId || edge.v2 === currentNodeId
+    //       )
+    //       .sort((a, b) => a.ponderacion - b.ponderacion); // Explorar primero las más cortas
+
+    //     for (const edge of edgesFromCurrent) {
+    //       const neighborId = edge.v1 === currentNodeId ? edge.v2 : edge.v1;
+
+    //       // Si el vecino es el nodo inicial y el ciclo tiene al menos 4 nodos
+    //       if (
+    //         neighborId === startNodeId &&
+    //         path.length >= 3 &&
+    //         isEdgeValid(path[path.length - 1], startNodeId)
+    //       ) {
+    //         const cycleDistance = currentDistance + edge.ponderacion;
+    //         if (cycleDistance < shortestCycleDistance) {
+    //           shortestCycleDistance = cycleDistance;
+    //           shortestCycle = [...path, neighborId];
+    //         }
+    //         continue;
+    //       }
+
+    //       // Evitar nodos repetidos en el camino (excepto el nodo inicial)
+    //       if (!visited.has(neighborId) && !path.includes(neighborId)) {
+    //         dfs(
+    //           neighborId,
+    //           [...path, neighborId],
+    //           currentDistance + edge.ponderacion
+    //         );
+    //       }
+    //     }
+
+    //     // Desmarcar el nodo al retroceder
+    //     visited.delete(currentNodeId);
+    //   };
+
+    //   // Función para comparar dos arreglos
+    //   const arraysEqual = (arr1: number[], arr2: number[]): boolean => {
+    //     if (arr1.length !== arr2.length) return false;
+    //     for (let i = 0; i < arr1.length; i++) {
+    //       if (arr1[i] !== arr2[i]) return false;
+    //     }
+    //     return true;
+    //   };
+
+    //   // Iniciar DFS desde el nodo inicial
+    //   dfs(startNodeId, [startNodeId], 0);
+
+    //   // Guardar el ciclo más corto encontrado
+    //   if (shortestCycle.length > 0) {
+    //     this.shortestPath = shortestCycle;
+    //     this.shortestDistance = shortestCycleDistance;
+    //     console.log("Ciclo más corto encontrado:", this.shortestPath);
+    //     console.log("Distancia del ciclo más corto:", this.shortestDistance);
+    //   } else {
+    //     console.log("No se encontró ningún ciclo desde el nodo", startNodeId);
+    //   }
+    // },
+    async runDijkstra(startNodeId: number, endNodeId: number): Promise<void> {
+      this.totalPaths = 0;
       if (startNodeId === endNodeId) {
         console.log("finding cycle...");
-        this.findShortestCycle(startNodeId);
+        await this.findShortestCycle(startNodeId);
         return;
       }
+
       const distances: { [key: number]: number } = {};
       const previousNodes: { [key: number]: number | null } = {};
       const unvisitedNodes: Set<number> = new Set(
@@ -306,6 +541,9 @@ export const useGraphStore = defineStore("graph", {
         distances[node.id] = node.id === startNodeId ? 0 : Infinity;
         previousNodes[node.id] = null;
       });
+
+      const delay = (ms: number) =>
+        new Promise((resolve) => setTimeout(resolve, ms));
 
       while (unvisitedNodes.size > 0) {
         let currentNodeId = -1;
@@ -325,6 +563,7 @@ export const useGraphStore = defineStore("graph", {
         const edgesFromCurrent = this.edges.filter(
           (edge) => edge.v1 === currentNodeId || edge.v2 === currentNodeId
         );
+
         for (const edge of edgesFromCurrent) {
           const neighborId = edge.v1 === currentNodeId ? edge.v2 : edge.v1;
           const alternativeDistance =
@@ -334,7 +573,11 @@ export const useGraphStore = defineStore("graph", {
             distances[neighborId] = alternativeDistance;
             previousNodes[neighborId] = currentNodeId;
           }
+          this.totalPaths += 1;
         }
+
+        // Liberar el hilo principal para otras acciones
+        await delay(0);
       }
 
       const path: number[] = [];
@@ -343,6 +586,8 @@ export const useGraphStore = defineStore("graph", {
       while (currentNode !== null) {
         path.unshift(currentNode);
         currentNode = previousNodes[currentNode];
+        // Liberar el hilo principal mientras se reconstruye el camino
+        await delay(0);
       }
 
       if (path[0] !== startNodeId) {
@@ -353,7 +598,74 @@ export const useGraphStore = defineStore("graph", {
         console.log("shortestPath: ", this.shortestPath);
       }
     },
+    // async runDijkstra(startNodeId: number, endNodeId: number) {
+    //   if (startNodeId === endNodeId) {
+    //     console.log("finding cycle...");
+    //     await this.findShortestCycle(startNodeId);
+    //     return;
+    //   }
+    //   const distances: { [key: number]: number } = {};
+    //   const previousNodes: { [key: number]: number | null } = {};
+    //   const unvisitedNodes: Set<number> = new Set(
+    //     this.nodes.map((node) => node.id)
+    //   );
+
+    //   this.nodes.forEach((node) => {
+    //     distances[node.id] = node.id === startNodeId ? 0 : Infinity;
+    //     previousNodes[node.id] = null;
+    //   });
+
+    //   while (unvisitedNodes.size > 0) {
+    //     let currentNodeId = -1;
+    //     let currentMinDistance = Infinity;
+
+    //     unvisitedNodes.forEach((nodeId) => {
+    //       if (distances[nodeId] < currentMinDistance) {
+    //         currentMinDistance = distances[nodeId];
+    //         currentNodeId = nodeId;
+    //       }
+    //     });
+
+    //     if (currentNodeId === endNodeId) break;
+
+    //     unvisitedNodes.delete(currentNodeId);
+
+    //     const edgesFromCurrent = this.edges.filter(
+    //       (edge) => edge.v1 === currentNodeId || edge.v2 === currentNodeId
+    //     );
+    //     for (const edge of edgesFromCurrent) {
+    //       const neighborId = edge.v1 === currentNodeId ? edge.v2 : edge.v1;
+    //       const alternativeDistance =
+    //         distances[currentNodeId] + edge.ponderacion;
+
+    //       if (alternativeDistance < distances[neighborId]) {
+    //         distances[neighborId] = alternativeDistance;
+    //         previousNodes[neighborId] = currentNodeId;
+    //       }
+    //     }
+    //   }
+
+    //   const path: number[] = [];
+    //   let currentNode: number | null = endNodeId;
+
+    //   while (currentNode !== null) {
+    //     path.unshift(currentNode);
+    //     currentNode = previousNodes[currentNode];
+    //   }
+
+    //   if (path[0] !== startNodeId) {
+    //     this.shortestPath = [];
+    //   } else {
+    //     this.shortestPath = path;
+    //     this.shortestDistance = distances[endNodeId];
+    //     console.log("shortestPath: ", this.shortestPath);
+    //   }
+    // },
     findSecondShortestPath(startNodeId: number, endNodeId: number) {
+      if (startNodeId === endNodeId) {
+        this.findSecondShortestCycle(startNodeId);
+        return;
+      }
       const firstPath = [...this.shortestPath]; // Copia del primer camino más corto
       const distances: { [key: number]: number } = {};
       const originalEdges = [...this.edges]; // Copia original de las aristas

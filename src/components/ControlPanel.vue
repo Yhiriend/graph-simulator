@@ -48,7 +48,9 @@
       <p v-text="secondPath"></p>
     </div>
 
-    <textarea v-model="result"></textarea>
+    <p>
+      total caminos recorridos: <strong>{{ result }}</strong>
+    </p>
   </div>
 </template>
 
@@ -59,7 +61,7 @@ import { ref, onMounted, watch, computed } from "vue";
 const graphStore = useGraphStore();
 const nodes = ref();
 const edges = ref();
-const result = ref("");
+const result = ref(0);
 const firstPath = computed(() => graphStore.shortestPath);
 const secondPath = computed(() => graphStore.secondShortestPath);
 const firstDistance = computed(() => graphStore.shortestDistance);
@@ -75,15 +77,15 @@ const cleanPaths = () => {
 };
 function findShortestPath() {
   graphStore.setIsLoading(true);
-  setTimeout(() => {
+  setTimeout(async () => {
     if (startNode.value !== null && endNode.value !== null) {
-      graphStore.runDijkstra(startNode.value, endNode.value);
+      await graphStore.runDijkstra(startNode.value, endNode.value);
       graphStore.findSecondShortestPath(startNode.value, endNode.value);
       const markNodes = graphStore.shortestPath
         .map((id) => graphStore.nodes.find((n) => n.id === id))
         .filter((node) => node !== undefined)
         .map((n) => n.nombre);
-      result.value = `Camino más corto: ${markNodes.join(", ")}`;
+      result.value = graphStore.totalPaths ?? 0;
     }
     graphStore.setIsLoading(false);
   }, 1500);
@@ -112,15 +114,15 @@ function findEulerianPathOrCircuit() {
   }
 
   if (oddNodes.length === 0) {
-    result.value = "El grafo tiene un circuito euleriano.";
+    //result.value = "El grafo tiene un circuito euleriano.";
     console.log("El grafo tiene un circuito euleriano.");
     return buildEulerianCircuit();
   } else if (oddNodes.length === 2) {
-    result.value = "El grafo tiene un camino euleriano.";
+    //result.value = "El grafo tiene un camino euleriano.";
     console.log("El grafo tiene un camino euleriano.");
     return buildEulerianPath(oddNodes[0], oddNodes[1]);
   } else {
-    result.value = "El grafo no tiene un camino ni circuito euleriano.";
+    //result.value = "El grafo no tiene un camino ni circuito euleriano.";
     console.log("El grafo no tiene un camino ni circuito euleriano.");
     return [];
   }
@@ -146,7 +148,7 @@ function buildEulerianCircuit() {
       path.push(stack.pop()!);
     }
   }
-  result.value += `[ ${path.reverse().join(", ")}]`;
+  //result.value += `[ ${path.reverse().join(", ")}]`;
   return path.reverse();
 }
 
@@ -172,7 +174,7 @@ function buildEulerianPath(startNode: number, endNode: number) {
     }
   }
   console.log(path.reverse());
-  result.value += `[ ${path.reverse().join(", ")}]`;
+  //result.value += `[ ${path.reverse().join(", ")}]`;
   return path.reverse();
 }
 

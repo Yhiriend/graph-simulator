@@ -4,6 +4,9 @@
     <h3>
       Buscando el camino más corto<span>{{ animatedDots }}</span>
     </h3>
+    <h3>
+      <span>{{ totalPaths }}</span> Caminos recorridos
+    </h3>
   </div>
 </template>
 
@@ -13,6 +16,7 @@ import { useGraphStore } from "../stores/graph.store";
 
 const graphStore = useGraphStore();
 const isVisible = computed(() => graphStore.isLoading);
+const totalPaths = computed(() => graphStore.totalPaths);
 
 // Control de los puntos animados
 const dots = ref("");
